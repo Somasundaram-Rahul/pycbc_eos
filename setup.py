@@ -304,7 +304,8 @@ setup (
     packages = find_packages(),
     package_data = {'pycbc.workflow': find_files('pycbc/workflow'),
                     'pycbc.results': find_files('pycbc/results'),
-                    'pycbc.neutron_stars': find_files('pycbc/neutron_stars')},
+                    'pycbc.neutron_stars': find_files('pycbc/neutron_stars'),
+                    'pycbc.eos': find_files('pycbc/eos')},
     ext_modules = ext,
     python_requires='>=3.7',
     classifiers=[

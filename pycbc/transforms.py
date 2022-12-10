@@ -28,6 +28,7 @@ from pycbc.boundaries import Bounds
 from pycbc import VARARGS_DELIM
 from pycbc.pnutils import jframe_to_l0frame
 
+from pycbc.eos import eos_sampler
 
 class BaseTransform(object):
     """A base class for transforming between two sets of parameters."""
@@ -1468,6 +1469,134 @@ class LambdaFromMultipleTOVFiles(BaseTransform):
         )
 
 
+    
+    
+
+
+class LambdaFromEOSParam(BaseTransform):
+    """
+    To be added
+    """
+
+    name = "lambda_from_eos_param"
+
+    def __init__(
+        self,
+        mass_param,
+        lambda_param,
+        distance=None,
+        redshift_mass=True,
+    ):
+        self._mass_param = mass_param
+        self._lambda_param = lambda_param
+        self._distance = distance
+        self.redshift_mass = redshift_mass
+        self._inputs = [mass_param, "alpha"
+                        "c3","c4","c5","c6","c7","c8","c9","c10","c11","c12",
+                        "distance"]
+        
+        self._outputs = [lambda_param]
+
+        super(LambdaFromEOSParam, self).__init__()
+
+    @property
+    def mass_param(self):
+        """Returns the input mass parameter."""
+        return self._mass_param
+
+    @property
+    def lambda_param(self):
+        """Returns the output lambda parameter."""
+        return self._lambda_param
+
+
+    @property
+    def distance(self):
+        """Returns the fixed distance to transform mass samples from detector
+        to source frame if one is specified.
+        """
+        return self._distance
+
+    
+    
+    @staticmethod
+    def lambda_from_eos_sampler(m_src,alpha, c2_s_grid):
+        """
+        To be added
+        """
+        
+        radius, mass, Lambda = eos_sampler.sample_eos(alpha, c2_s_grid)
+        
+        if m_src > mass.max():
+            # assume black hole
+            lambdav = 0.0
+        else:
+            lambdav = numpy.exp(numpy.interp(m_src, mass, numpy.log(Lambda)))
+        return lambdav
+
+    
+    
+
+    def transform(self, maps):
+        """To be added"""
+        m = maps[self._mass_param]
+        
+        c2_s_grid = numpy.array([maps["c3"],maps["c4"],maps["c5"],maps["c6"],
+                              maps["c7"],maps["c8"],maps["c9"],maps["c10"],
+                              maps["c11"],maps["c12"]])
+        alpha = maps["alpha"]
+
+        if self.redshift_mass:
+            if self._distance is not None:
+                d = self._distance
+            else:
+                try:
+                    d = maps["distance"]
+                except KeyError as e:
+                    logging.warning(
+                        "Either provide distance samples in the "
+                        "list of samples to be transformed, or "
+                        "provide a fixed distance value as input "
+                        "when initializing LambdaFromTOVFile."
+                    )
+                    raise e
+            shift = 1.0 / (1.0 + cosmology.redshift(abs(d)))
+        else:
+            shift = 1.0
+        out = {
+            self._lambda_param: self.lambda_from_eos_sampler(
+                m * shift, alpha, c2_s_grid
+            )
+        }
+        return self.format_output(maps, out)
+
+
+        
+        
+    @classmethod
+    def from_config(cls, cp, section, outputs):
+        # see if we're redshifting masses
+        if cp.has_option("-".join([section, outputs]), "do-not-redshift-mass"):
+            additional_opts = {"redshift_mass": False}
+            skip_opts = ["do-not-redshift-mass"]
+        else:
+            additional_opts = None
+            skip_opts = None
+        return super(LambdaFromEOSParam, cls).from_config(
+            cp, section, outputs, skip_opts=skip_opts, additional_opts=additional_opts
+        )
+
+
+    
+    
+        
+    
+
+    
+    
+    
+    
+     
 class Log(BaseTransform):
     """Applies a log transform from an `inputvar` parameter to an `outputvar`
     parameter. This is the inverse of the exponent transform.
@@ -2240,6 +2369,7 @@ transforms = {
     Logistic.name: Logistic,
     LambdaFromTOVFile.name: LambdaFromTOVFile,
     LambdaFromMultipleTOVFiles.name: LambdaFromMultipleTOVFiles,
+    LambdaFromEOSParam.name: LambdaFromEOSParam,
     AlignTotalSpin.name: AlignTotalSpin,
 }
 
